@@ -1,7 +1,0 @@
-{
-  "version": 2,
-  "routes": [
-    { "src": "/api/submit-entry", "dest": "/api/submit-entry.js" },
-    { "src": "/api/get-leaderboard", "dest": "/api/get-leaderboard.js" }
-  ]
-}
