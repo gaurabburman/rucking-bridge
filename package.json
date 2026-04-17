@@ -1,0 +1,9 @@
+{
+  "name": "rucking-api-bridge",
+  "version": "7.9.1",
+  "description": "API for RuckingIndia Bunker",
+  "dependencies": {
+    "firebase-admin": "^12.0.0",
+    "mongodb": "^6.5.0"
+  }
+}
