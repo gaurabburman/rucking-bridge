@@ -41,6 +41,29 @@ module.exports = async (req, res) => {
         await client.connect();
         const db = client.db('RuckingIndia_DB');
 
+        // =========================================================================
+        // 🔥 CRITICAL SELF-HEALING BLOCK: AUTOMATIC 'USERS' PROFILE INJECTION
+        // =========================================================================
+        const userProfileExists = await db.collection('users').findOne({ uid: uid });
+        if (!userProfileExists) {
+            const automaticProfileEntry = {
+                uid: uid,
+                name: ruckingData.operatorName || "Unknown Operator",
+                email: operatorEmail,
+                mobile: "+919932231121", // Fallback Default or Dynamic Parameter
+                role: operatorEmail === 'gaurab.burman@gmail.com' ? 'master-ops' : 'civilian-ops',
+                status: 'active',
+                registered_at: new Date()
+            };
+            await db.collection('users').updateOne(
+                { uid: uid },
+                { $set: automaticProfileEntry },
+                { upsert: true }
+            );
+            console.log(`📡 Dynamic Target Lock: User profile self-healed inside bunker for UID: ${uid}`);
+        }
+        // =========================================================================
+
         // 5. 360-DEGREE TACTICAL DATA NORMALIZATION (Single Mission Object)
         const currentMissionLog = {
             mission_id: new Date().getTime().toString(),
