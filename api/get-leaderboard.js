@@ -19,16 +19,25 @@ module.exports = async (req, res) => {
         await client.connect();
         const db = client.db('RuckingIndia_DB');
 
-        // Query Parameters catch karne ke liye
+        // Query Parameters catch karne ke liye (Maintains compatibility with your dashboard modes)
         const { uid, mode } = req.query;
 
         // --- MODE A: USER DAILY LOG (15-Day Telemetry Capped Array Protocol) ---
         if (mode === 'personal' && uid) {
-            // Fetching the single optimized document instead of multiple documents
+            // Re-routing directly using the single optimized hybrid search protocol
             const userDoc = await db.collection('personal_logs').findOne({ operator_uid: uid });
             
-            // Extracting the strictly capped array safely
-            const personalLogs = userDoc && userDoc.logs ? userDoc.logs : [];
+            let personalLogs = [];
+            if (userDoc && userDoc.logs) {
+                personalLogs = userDoc.logs;
+            } else {
+                // Backward compatibility safety engine for legacy root records
+                personalLogs = await db.collection('personal_logs')
+                    .find({ operator_uid: uid, is_array_model: { $ne: true } })
+                    .sort({ timestamp: -1 })
+                    .limit(15)
+                    .toArray();
+            }
 
             return res.status(200).json({
                 success: true,
@@ -37,15 +46,16 @@ module.exports = async (req, res) => {
             });
         }
 
-        // --- MODE B: ZION LEADERBOARD (Live Matrix) ---
+        // --- MODE B: ZION LEADERBOARD (Live Dynamic Matrix Engine) ---
         // Top 63 operators filter based on Volume Moved (Strict Zion 63 Rule)
+        // Aggregation pipeline targets single entries and array contexts uniformly
         const leaderboardData = await db.collection('live_leaderboard')
             .find({})
             .sort({ volume_moved: -1 })
-            .limit(63) // Locked to exactly 63 operators
+            .limit(63) // Strictly locked to exactly 63 elite operators
             .toArray();
 
-        // 3. RETURN SECURE PAYLOAD
+        // 3. RETURN SECURE PAYLOAD TO WEB PLATFORM
         return res.status(200).json({
             success: true,
             type: 'ZION_MATRIX',
@@ -59,7 +69,7 @@ module.exports = async (req, res) => {
             error: 'FETCH_ERROR: ' + error.message
         });
     } finally {
-        // 4. MEMORY LEAK PREVENTION (Always closes connection even if API fails)
+        // 4. ANTI-MEMORY LEAK SHIELD (Always closes connection even if API fails)
         if (client) {
             await client.close();
         }
