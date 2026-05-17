@@ -64,7 +64,6 @@ module.exports = async (req, res) => {
         // 6. ACTION: DUAL COLLECTION WRITING WITH HYBRID BRANCHING RULES
         if (operatorEmail === 'gaurab.burman@gmail.com') {
             // DADA ROOT MODE: Save data as old flat individual documents to protect your history
-            // Sets explicit identity field for your root environment logs
             const flatLogEntry = {
                 ...currentMissionLog,
                 operator_uid: uid,
@@ -113,4 +112,30 @@ module.exports = async (req, res) => {
                     country: ruckingData.country || "Global",
                     ruck_weight: parseFloat(ruckingData.loadWeight) || 0,
                     volume_moved: parseFloat(ruckingData.volumeMoved) || 0,
-                    calories_burned: parseInt(ruck
+                    calories_burned: parseInt(ruckingData.caloriesBurned) || 0,
+                    pace: ruckingData.pace || "0:00",
+                    timestamp: new Date()
+                }
+            },
+            { upsert: true }
+        );
+
+        // Success Response
+        return res.status(200).json({ 
+            success: true, 
+            message: 'MISSION SUCCESS: Tactical Data Synchronized and Secured!' 
+        });
+
+    } catch (error) {
+        console.error("BUNKER BREACH ERROR:", error.message);
+        return res.status(200).json({ 
+            success: false, 
+            error: 'BACKEND_ERROR: ' + error.message 
+        });
+    } finally {
+        // ANTI-MEMORY LEAK SHIELD ALWAYS ENFORCED
+        if (client) {
+            await client.close(); 
+        }
+    }
+};
