@@ -9,9 +9,7 @@ module.exports = async (req, res) => {
 
     if (req.method === 'OPTIONS') return res.status(200).end();
 
-    // RULE 4: GLOBAL ANTI-MEMORY LEAK SHIELD
-    let client; 
-
+    let client;
     try {
         // 2. FIREBASE SECURE INITIALIZATION
         if (!admin.apps.length) {
@@ -29,136 +27,112 @@ module.exports = async (req, res) => {
             });
         }
 
-        const { idToken, ruckingData } = req.body;
-        
-        // 3. OPERATOR IDENTITY VERIFICATION
+        // 3. SECURITY GATEWAY: Token Extraction & Validation
+        const authHeader = req.headers.authorization;
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return res.status(401).json({ success: false, error: 'UNAUTHORIZED: Identity token missing.' });
+        }
+
+        const idToken = authHeader.split('Bearer ')[1];
         const decodedToken = await admin.auth().verifyIdToken(idToken);
         const uid = decodedToken.uid;
-        const operatorEmail = decodedToken.email ? decodedToken.email.toLowerCase() : '';
+        const operatorEmail = decodedToken.email || "";
 
-        // 4. CONNECTION TO MONGODB BUNKER
+        // 4. EXTRACT PAYLOAD FROM CALCULATOR FRONTEND
+        const { ruckingData } = req.body;
+        if (!ruckingData) {
+            return res.status(400).json({ success: false, error: 'BAD REQUEST: Rucking data payload missing.' });
+        }
+
+        // 5. MONGODB BUNKER CONNECTION
         client = new MongoClient(process.env.MONGODB_URI);
         await client.connect();
         const db = client.db('RuckingIndia_DB');
 
-        // =========================================================================
-        // 🔥 CRITICAL SELF-HEALING BLOCK: AUTOMATIC 'USERS' PROFILE INJECTION
-        // =========================================================================
-        const userProfileExists = await db.collection('users').findOne({ uid: uid });
-        if (!userProfileExists) {
-            const automaticProfileEntry = {
-                uid: uid,
-                name: ruckingData.operatorName || "Unknown Operator",
-                email: operatorEmail,
-                mobile: "+919932231121", // Fallback Default or Dynamic Parameter
-                role: operatorEmail === 'gaurab.burman@gmail.com' ? 'master-ops' : 'civilian-ops',
-                status: 'active',
-                registered_at: new Date()
-            };
-            await db.collection('users').updateOne(
-                { uid: uid },
-                { $set: automaticProfileEntry },
-                { upsert: true }
-            );
-            console.log(`📡 Dynamic Target Lock: User profile self-healed inside bunker for UID: ${uid}`);
-        }
-        // =========================================================================
-
-        // 5. 360-DEGREE TACTICAL DATA NORMALIZATION (Single Mission Object)
-        const currentMissionLog = {
-            mission_id: new Date().getTime().toString(),
-            height_cm: parseFloat(ruckingData.heightCm) || 0,
-            body_weight: parseFloat(ruckingData.bodyWeight) || 0,
-            body_weight_unit: ruckingData.bodyWeightUnit || "kg",
+        // 6. MAP DATA ENGINE STRUCTURE (Strictly keeping your schema names untouched)
+        const singleLifeEntry = {
+            operator_uid: uid,
+            operator_email: operatorEmail,
+            operator_name: ruckingData.operatorName || "Unknown Operator",
+            operator_type: ruckingData.operatorType || "civilian",
+            age: parseInt(ruckingData.age) || 0,
+            country: ruckingData.country || "India",
+            gender: ruckingData.gender || "male",
             ruck_weight: parseFloat(ruckingData.loadWeight) || 0,
-            ruck_weight_unit: ruckingData.loadWeightUnit || "kg",
-            distance_km: parseFloat(ruckingData.distanceKm) || 0,
-            duration_min: parseInt(ruckingData.durationMin) || 0,
-            slope_percent: ruckingData.slopePercent || "0",
-            terrain_factor: ruckingData.terrainFactor || "1.0",
-            bmi: parseFloat(ruckingData.bmi) || 0,
+            pace: ruckingData.pace || "00:00",
             calories_burned: parseInt(ruckingData.caloriesBurned) || 0,
             volume_moved: parseFloat(ruckingData.volumeMoved) || 0,
-            volume_unit: ruckingData.volumeUnit || "KG-KM",
-            pace: ruckingData.pace || "0:00",
-            timestamp: new Date() 
+            height_cm: parseFloat(ruckingData.heightCm) || 0,
+            body_weight: parseFloat(ruckingData.bodyWeight) || 0,
+            distance_km: parseFloat(ruckingData.distanceKm) || 0,
+            duration_min: parseInt(ruckingData.durationMin) || 0,
+            timestamp: ruckingData.timestamp || new Date().toISOString()
         };
 
-        // 6. ACTION: DUAL COLLECTION WRITING WITH HYBRID BRANCHING RULES
-        if (operatorEmail === 'gaurab.burman@gmail.com') {
-            // DADA ROOT MODE: Save data as old flat individual documents to protect your history
-            const flatLogEntry = {
-                ...currentMissionLog,
-                operator_uid: uid,
-                operator_email: operatorEmail,
-                operator_name: ruckingData.operatorName || "Gaurab Burman",
-                age: parseInt(ruckingData.age) || 45,
-                gender: ruckingData.gender || "male",
-                country: ruckingData.country || "India"
-            };
-            await db.collection('personal_logs').insertOne(flatLogEntry);
+        // COMMANDER LOCKED ROOT EMAIL IDENTIFIER
+        const CORE_ADMIN_EMAIL = "gaurabburman@gmail.com"; 
+
+        // 7. BLOCK EXECUTION: PERSONAL LOGS HANDLING WITH DYNAMIC TRACK SEPARATION
+        let logFilter = {};
+        
+        if (operatorEmail.toLowerCase() === CORE_ADMIN_EMAIL.toLowerCase()) {
+            // Main Commander Root Level Storage Path
+            logFilter = { operator_uid: uid, storage_layer: "root" };
+            singleLifeEntry.storage_layer = "root";
         } else {
-            // USER TREE MODE: Dynamic segmented arrays for Lipi and Maa
-            await db.collection('personal_logs').updateOne(
-                { operator_uid: uid },
-                {
-                    $set: {
-                        operator_email: operatorEmail,
-                        operator_name: ruckingData.operatorName || "Unknown Operator",
-                        age: parseInt(ruckingData.age) || 0,
-                        gender: ruckingData.gender || "--",
-                        country: ruckingData.country || "Global",
-                        is_array_model: true, // Safeguards telemetry matching routing
-                        last_updated: new Date()
-                    },
-                    $push: {
-                        logs: {
-                            $each: [currentMissionLog],
-                            $sort: { timestamp: -1 }, 
-                            $slice: 15 // Keeps 15-day hard cap for storage shield
-                        }
-                    }
-                },
-                { upsert: true }
-            );
+            // Regular User Tree Isolated Structure 
+            logFilter = { operator_uid: uid, storage_layer: `user_tree_${uid}` };
+            singleLifeEntry.storage_layer = `user_tree_${uid}`;
         }
 
-        // 7. ZION MATRIX UNIFIED UPDATE RULE (One Operator = One Leaderboard Row)
-        await db.collection('live_leaderboard').updateOne(
-            { operator_uid: uid },
-            {
-                $set: {
-                    operator_email: operatorEmail,
-                    operator_name: ruckingData.operatorName || "Unknown Operator",
-                    age: parseInt(ruckingData.age) || 0,
-                    gender: ruckingData.gender || "--",
-                    country: ruckingData.country || "Global",
-                    ruck_weight: parseFloat(ruckingData.loadWeight) || 0,
-                    volume_moved: parseFloat(ruckingData.volumeMoved) || 0,
-                    calories_burned: parseInt(ruckingData.caloriesBurned) || 0,
-                    pace: ruckingData.pace || "0:00",
-                    timestamp: new Date()
-                }
-            },
-            { upsert: true }
-        );
+        // Save current transaction mission record
+        await db.collection('personal_logs').insertOne(singleLifeEntry);
 
-        // Success Response
-        return res.status(200).json({ 
-            success: true, 
-            message: 'MISSION SUCCESS: Tactical Data Synchronized and Secured!' 
+        // Fetch logs sorted by latest timestamp to enforce strict 15-day restriction
+        const personalLogsArray = await db.collection('personal_logs')
+            .find(logFilter)
+            .sort({ timestamp: -1 })
+            .toArray();
+
+        // Strict 15-Day Roll-Over Capping Trigger Logic
+        if (personalLogsArray.length > 15) {
+            const excessLogs = personalLogsArray.slice(15);
+            const idsToRemove = excessLogs.map(log => log._id);
+            await db.collection('personal_logs').deleteMany({ _id: { $in: idsToRemove } });
+        }
+
+        // 8. BLOCK EXECUTION: ANTI-DUPLICATION GLOBAL LEADERBOARD INTEGRITY
+        const existingLeaderboardRecord = await db.collection('live_leaderboard').findOne({ operator_uid: uid });
+
+        if (!existingLeaderboardRecord) {
+            // Unique new entry on matrix grid list
+            await db.collection('live_leaderboard').insertOne(singleLifeEntry);
+        } else {
+            // Evaluate if current system log has higher volume performance than historic data
+            if (singleLifeEntry.volume_moved > (existingLeaderboardRecord.volume_moved || 0)) {
+                await db.collection('live_leaderboard').updateOne(
+                    { operator_uid: uid },
+                    { $set: singleLifeEntry }
+                );
+            }
+            // If new volume performance is lower, previous high score stays safe without row splitting.
+        }
+
+        // 9. COLD SUCCESS RETURNING PAYLOAD
+        return res.status(200).json({
+            success: true,
+            message: 'BUNKER SYNC COMPLETE: Telemetry Isolated for Commander & 15-Day Rolling Limits Enforced Successfully.'
         });
 
     } catch (error) {
-        console.error("BUNKER BREACH ERROR:", error.message);
-        return res.status(200).json({ 
-            success: false, 
-            error: 'BACKEND_ERROR: ' + error.message 
+        console.error("CRITICAL BACKEND VAULT SECURITY ERROR:", error.message);
+        return res.status(200).json({
+            success: false,
+            error: 'BACKEND_SECURE_ERROR: ' + error.message
         });
     } finally {
-        // ANTI-MEMORY LEAK SHIELD ALWAYS ENFORCED
         if (client) {
-            await client.close(); 
+            await client.close();
         }
     }
 };
