@@ -1,77 +1,45 @@
 const { MongoClient } = require('mongodb');
 
 module.exports = async (req, res) => {
-    // 1. CORS SHIELD - Secure Public & Private Access
+    // 1. CORS SHIELD - Secure Public & Private Telemetry Access
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-    // Pre-flight request pass
-    if (req.method === 'OPTIONS') {
-        return res.status(200).end();
-    }
+    if (req.method === 'OPTIONS') return res.status(200).end();
 
     let client;
-
     try {
-        // 2. MONGODB BUNKER CONNECTION
+        // 2. CONNECTION TO MONGODB VAULT NODE
         client = new MongoClient(process.env.MONGODB_URI);
         await client.connect();
         const db = client.db('RuckingIndia_DB');
 
-        // Query Parameters catch karne ke liye (Maintains compatibility with your dashboard modes)
-        const { uid, mode } = req.query;
-
-        // --- MODE A: USER DAILY LOG (15-Day Telemetry Capped Array Protocol) ---
-        if (mode === 'personal' && uid) {
-            // Re-routing directly using the single optimized hybrid search protocol
-            const userDoc = await db.collection('personal_logs').findOne({ operator_uid: uid });
-            
-            let personalLogs = [];
-            if (userDoc && userDoc.logs) {
-                personalLogs = userDoc.logs;
-            } else {
-                // Backward compatibility safety engine for legacy root records
-                personalLogs = await db.collection('personal_logs')
-                    .find({ operator_uid: uid, is_array_model: { $ne: true } })
-                    .sort({ timestamp: -1 })
-                    .limit(15)
-                    .toArray();
-            }
-
-            return res.status(200).json({
-                success: true,
-                type: 'TELEMETRY_LOG',
-                data: personalLogs
-            });
-        }
-
-        // --- MODE B: ZION LEADERBOARD (Live Dynamic Matrix Engine) ---
-        // Top 63 operators filter based on Volume Moved (Strict Zion 63 Rule)
-        // Aggregation pipeline targets single entries and array contexts uniformly
+        // 3. BLOCK EXECUTION: ZION MATRIX TOP 63 CALORIE EVALUATION
+        // Database ke collection se documents ko calories_burned ke descending order me sort karke top 63 records pull karega
         const leaderboardData = await db.collection('live_leaderboard')
             .find({})
-            .sort({ volume_moved: -1 })
-            .limit(63) // Strictly locked to exactly 63 elite operators
+            .sort({ calories_burned: -1 }) // Highest Calorie Consumption First
+            .limit(63)                     // Hard locked limit for top 63 operators
             .toArray();
 
-        // 3. RETURN SECURE PAYLOAD TO WEB PLATFORM
+        // 4. RETURN SECURE PAYLOAD TO GLOBAL MATRIX GRID
         return res.status(200).json({
             success: true,
             type: 'ZION_MATRIX',
+            message: 'TACTICAL MATRIX LIVE: Top 63 operators loaded based on absolute calorie burning profile.',
             data: leaderboardData
         });
 
     } catch (error) {
-        console.error("Bunker Retrieval Error:", error.message);
-        return res.status(500).json({
+        console.error("CRITICAL BUNKER RETRIEVAL ERROR:", error.message);
+        return res.status(200).json({
             success: false,
             error: 'FETCH_ERROR: ' + error.message
         });
     } finally {
-        // 4. ANTI-MEMORY LEAK SHIELD (Always closes connection even if API fails)
         if (client) {
-            await client.close();
+            await client.close(); // Memory leak armor active
         }
     }
 };
