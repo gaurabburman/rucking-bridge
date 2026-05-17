@@ -50,19 +50,18 @@ module.exports = async (req, res) => {
         await client.connect();
         const db = client.db('RuckingIndia_DB');
 
-        // 5. FETCH 15-DAY TACTICAL TELEMETRY
-        // Sirf wahi data pull hoga jo is specific operator (uid) ka hai
-        const logs = await db.collection('personal_logs')
-            .find({ operator_uid: uid })
-            .sort({ timestamp: -1 }) // Newest mission first
-            .limit(15) // Strictly 15-day telemetry
-            .toArray();
+        // 5. FETCH 15-DAY TACTICAL TELEMETRY (Asset-Light Array Protocol)
+        // Targeting the single optimized document for this operator
+        const userDocument = await db.collection('personal_logs').findOne({ operator_uid: uid });
+        
+        // Zero-Log Safety Net: Extracting the strict 15-day array or returning empty array if no logs exist
+        const logsPayload = userDocument && userDocument.logs ? userDocument.logs : [];
 
-        // 6. RETURN SECURE PAYLOAD TO DASHBOARD
+        // 6. RETURN SECURE PAYLOAD TO WEB DASHBOARD
         return res.status(200).json({
             success: true,
             message: 'Tactical Intel Retrieved',
-            data: logs
+            data: logsPayload
         });
 
     } catch (error) {
@@ -73,8 +72,9 @@ module.exports = async (req, res) => {
             error: 'BACKEND_ERROR: ' + error.message
         });
     } finally {
+        // 7. ANTI-MEMORY LEAK SHIELD
         if (client) {
-            await client.close(); // Memory leak prevention
+            await client.close();
         }
     }
 };
