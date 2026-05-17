@@ -59,11 +59,14 @@ module.exports = async (req, res) => {
             country: ruckingData.country || "India",
             gender: ruckingData.gender || "male",
             ruck_weight: parseFloat(ruckingData.loadWeight) || 0,
+            ruck_weight_unit: ruckingData.loadWeightUnit || "kg",
             pace: ruckingData.pace || "00:00",
             calories_burned: parseInt(ruckingData.caloriesBurned) || 0,
             volume_moved: parseFloat(ruckingData.volumeMoved) || 0,
+            volume_unit: ruckingData.volumeUnit || "KG-KM",
             height_cm: parseFloat(ruckingData.heightCm) || 0,
             body_weight: parseFloat(ruckingData.bodyWeight) || 0,
+            body_weight_unit: ruckingData.bodyWeightUnit || "kg",
             distance_km: parseFloat(ruckingData.distanceKm) || 0,
             duration_min: parseInt(ruckingData.durationMin) || 0,
             timestamp: ruckingData.timestamp || new Date().toISOString()
@@ -85,7 +88,7 @@ module.exports = async (req, res) => {
             singleLifeEntry.storage_layer = `user_tree_${uid}`;
         }
 
-        // Save current transaction mission record
+        // Save current transaction mission record in single source of truth
         await db.collection('personal_logs').insertOne(singleLifeEntry);
 
         // Fetch logs sorted by latest timestamp to enforce strict 15-day restriction
@@ -101,27 +104,10 @@ module.exports = async (req, res) => {
             await db.collection('personal_logs').deleteMany({ _id: { $in: idsToRemove } });
         }
 
-        // 8. BLOCK EXECUTION: ANTI-DUPLICATION GLOBAL LEADERBOARD INTEGRITY
-        const existingLeaderboardRecord = await db.collection('live_leaderboard').findOne({ operator_uid: uid });
-
-        if (!existingLeaderboardRecord) {
-            // Unique new entry on matrix grid list
-            await db.collection('live_leaderboard').insertOne(singleLifeEntry);
-        } else {
-            // Evaluate if current system log has higher volume performance than historic data
-            if (singleLifeEntry.volume_moved > (existingLeaderboardRecord.volume_moved || 0)) {
-                await db.collection('live_leaderboard').updateOne(
-                    { operator_uid: uid },
-                    { $set: singleLifeEntry }
-                );
-            }
-            // If new volume performance is lower, previous high score stays safe without row splitting.
-        }
-
-        // 9. COLD SUCCESS RETURNING PAYLOAD
+        // 8. COLD SUCCESS RETURNING PAYLOAD (No more leaderboard collection split duplication)
         return res.status(200).json({
             success: true,
-            message: 'BUNKER SYNC COMPLETE: Telemetry Isolated for Commander & 15-Day Rolling Limits Enforced Successfully.'
+            message: 'BUNKER SYNC COMPLETE: Telemetry Isolated & 15-Day Rolling Limits Enforced Successfully.'
         });
 
     } catch (error) {
